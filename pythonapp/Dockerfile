@@ -3,7 +3,8 @@ FROM python:3.11-slim
 
 # Install required dependencies
 RUN pip install mysql-connector-python && \
-    pip install python-dotenv
+    pip install python-dotenv && \
+    pip install bcrypt
 
 # Copy application files to the /app directory in the container
 COPY . /app
