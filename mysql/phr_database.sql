@@ -1,5 +1,3 @@
-CREATE DATABASE IF NOT EXISTS db
-
 use db;
 
 CREATE TABLE user_types (
@@ -27,7 +25,7 @@ CREATE TABLE users (
 CREATE TABLE health_records (
     record_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
-    record_date DATE NOT NULL,
+    record_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     record_text TEXT,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
@@ -86,6 +84,7 @@ VALUES
     ('Health Records'),
     ('Healthcare Providers'),
     ('User Provider'),
+    ('Reminders'),
     ('Permissions');
 
 INSERT INTO users (fullname, contact, type_id, email, password_hash)
@@ -132,16 +131,20 @@ VALUES
     (2, 1, 1, 1, 1), 
     (3, 1, 1, 1, 1), 
     (4, 1, 1, 1, 1), 
-    (5, 1, 1, 1, 1), 
+    (5, 1, 1, 1, 1),
+    (6, 1, 1, 1, 1),
+
 
     (1, 2, 0, 1, 0), 
     (2, 2, 1, 1, 1), 
     (3, 2, 0, 1, 0),
     (4, 2, 0, 1, 0), 
-    (5, 2, 0, 0, 0), 
+    (5, 2, 1, 1, 1),
+    (6, 0, 0, 0, 0),
 
     (1, 3, 0, 0, 0), 
     (2, 3, 1, 1, 1), 
     (3, 3, 0, 1, 0), 
     (4, 3, 0, 1, 0), 
-    (5, 3, 0, 0, 0); 
+    (5, 3, 1, 1, 1),
+    (6, 3, 0, 0, 0); 
