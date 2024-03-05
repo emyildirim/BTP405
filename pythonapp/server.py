@@ -64,6 +64,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         # HTTP REQUEST METHODS
         
         GET     /register               creates a new user
+        GET     /login                  authenticates a user
         GET     /profile                returns your profile info
         GET     /healthcare             returns all healthcare providers
         GET     /healthcare/me          returns the user's healthcare provider

@@ -89,9 +89,9 @@ VALUES
 
 INSERT INTO users (fullname, contact, type_id, email, password_hash)
 VALUES
-    ('Alice Watson', '1234567890', 1, 'alice1982@yahoo.com', '...'),
-    ('Charles Hicks', '9876543210', 2, 'cahrlesh4@outlook.com', '...'),
-    ('Will Mitchell', '5551234567', 3, 'mitchel91@gmail.com', '...');
+    ('Alice Watson', '1234567890', 1, 'alice1982@yahoo.com', '$2b$12$emLsishYhEyFqWYpt.VDa.W8uxUXRSHdYQThVUmUArG5O.bXDqsXS'),
+    ('Charles Hicks', '9876543210', 2, 'cahrlesh4@outlook.com', '$2b$12$eDGqan.IYBYR0esBhLpbB.5G.WtuScBLz/U9bSJz6nWwpnBOfBMv6'),
+    ('Will Mitchell', '5551234567', 3, 'mitchel91@gmail.com', '$2b$12$/f0cGR95M0QmVm5u3mNGqufDkRXJ1Xt/ZU0p3Bg.IjEyb6rLAm4gO');
 
 INSERT INTO health_records (user_id, record_date, record_text)
 VALUES
