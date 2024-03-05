@@ -23,21 +23,6 @@ print("DB connected")
 
 cursor = db_connection.cursor()
 
-# Check if the 
-def authenticate_user(self, username, password):
-
-        # Fetch user data from database based on username
-        cursor.execute("SELECT * FROM users WHERE email = %s", (username,))
-        user_data = cursor.fetchone()
-
-        if user_data:
-            # Check if the password matches
-            hashed_password = user_data[1]  # Assuming password is stored in the second column
-            if bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8')):
-                return True
-
-        return False
-
 class JWTHandler:
     @staticmethod
     def generate_token(data):
@@ -206,7 +191,28 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.set_Response(200, {'message': 'user created successfully', 'token': token})
         else:
             self.set_Response(400, {'message': 'bad request'})
-        
+    
+    def authenticate_user(self):
+            
+            content_len = int(self.headers['Content-Length'])
+            data_rec = self.rfile.read(content_len)
+            data = json.loads(data_rec.decode())
+            email = data.get('email', '')
+            password = data.get('password', '')
+            
+            if email and password:
+                cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+                user = cursor.fetchall()
+                if user:
+                    if bcrypt.checkpw(password.encode('utf-8'), user['password_hash']):
+                        token = JWTHandler.generate_token({'email': email})
+                        self.set_Response(200, {'message': 'login successful', 'token': token})
+                    else:
+                        self.set_Response(401, {'message': 'incorrect password'})
+                else:
+                    self.set_Response(404, {'message': 'user not found'})
+            else:
+                self.set_Response(400, {'message': 'bad request'})
 
     def get_profile_info(self):
         
