@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from datetime import datetime, timedelta
 import bcrypt 
 import json
 import mysql.connector
@@ -25,7 +26,9 @@ cursor = db_connection.cursor()
 
 class JWTHandler:
     @staticmethod
-    def generate_token(data):
+    def generate_token(data, expire_duration=60):
+        exp = datetime.utcnow() + timedelta(minutes=expire_duration)
+        data.update({"exp": exp})
         token = jwt.encode(data, SECRET_KEY, algorithm='HS256')
         return token
 
@@ -49,16 +52,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(message).encode())
     
     def verify_user(self):
-        token = self.headers.get('Authorization')
-        if token:
+        header = self.headers.get('Authorization')
+        if header:
+            parts = header.split(' ')
+            token = parts[1] if len(parts) == 2 else header
             value = JWTHandler.verify_token(token)
-            if type(value) is not 'dict':
-                return value
-            else:
+            if value.get("message"):
                 self.set_Response(401, value)
                 return False
+            else:
+                return value
         else:
-            self.set_Response(401, {'message': 'unauthorized'})
+            self.set_Response(401, {'message': 'unauthorized, no Authorization header provided'})
             return False
     
     '''
@@ -105,7 +110,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif paths[1] == 'profile':
             self.get_profile_info()
         elif paths[1] == 'healthcare':
-            if paths[2] == 'me':
+            if len(paths) == 3 and paths[2] == 'me':
                 self.get_user_healthcare_provider()
             else:
                 self.get_all_healthcare_providers()
@@ -223,9 +228,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def get_profile_info(self):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT fullname, contact, email FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT fullname, contact, email FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 profile = {
@@ -240,9 +245,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def get_all_healthcare_providers(self):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
             result = cursor.fetchone()
             if result:
                 type_id = result[0]
@@ -264,9 +269,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def get_user_healthcare_provider(self):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchall()
             cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 4", (user['type_id'],))
             if cursor.fetchone():
@@ -282,9 +287,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def get_all_health_records(self):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
@@ -311,9 +316,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def get_specific_health_record(self, record_id):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
@@ -340,9 +345,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def get_all_permissions(self):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
             result = cursor.fetchone()
             if result:
                 type_id = result[0]
@@ -359,16 +364,16 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def get_all_reminders(self):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT user_id FROM users WHERE email = %s", (payload["email"],))
             result = cursor.fetchone()
             if result:
                 user_id = result[0]
                 cursor.execute("SELECT * FROM reminders WHERE user_id = %s", (user_id,))
                 reminders = cursor.fetchall()
                 if reminders:
-                    formatted_reminders = [{'reminder_id': rem[0], 'user_id': rem[1], 'reminder_text': rem[2], 'reminder_date': rem[3]} for rem in reminders]
+                    formatted_reminders = [{'reminder_id': rem[0], 'user_id': rem[1], 'reminder_text': rem[2], 'reminder_date': rem[3].isoformat()} for rem in reminders]
                     self.set_Response(200, formatted_reminders)
                 else:
                     self.set_Response(404, {'message': 'no reminders found'})
@@ -377,9 +382,9 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def get_due_reminders(self):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT user_id FROM users WHERE email = %s", (payload["email"],))
             result = cursor.fetchone()
             if result:
                 user_id = result[0]
@@ -393,10 +398,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             else:
                 self.set_Response(403, {'message': 'user not found or no user_id associated'})
 
+
     def get_specific_reminder(self, reminder_id):
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
@@ -425,9 +432,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         data = json.loads(data_rec.decode())
         record_text = data.get('record_text', '')
 
-        email = self.verify_user()
-        if email and record_text:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload and record_text:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
@@ -452,9 +459,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         reminder_text = data.get('reminder_text', '')
         reminder_date = data.get('reminder_date', '')
 
-        email = self.verify_user()
-        if email and reminder_text and reminder_date:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload and reminder_text and reminder_date:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
@@ -479,10 +486,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         provider_address = data.get('provider_address', '')
         provider_contact = data.get('provider_contact', '')
         
-        email = self.verify_user()
-        if email:
+        payload = self.verify_user()
+        if payload:
             if provider_name and provider_address and provider_contact:
-                cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+                cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
                 user = cursor.fetchall()
                 cursor.execute("SELECT can_add FROM permissions WHERE type_id = %s AND resource_id = 3", (user['type_id'],))
                 if cursor.fetchone():
@@ -503,10 +510,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         fullname = data.get('fullname', '')
         contact = data.get('contact', '')
         
-        email = self.verify_user()
-        if email:
+        payload = self.verify_user()
+        if payload:
             if fullname and contact:
-                cursor.execute("SELECT user_id FROM users WHERE email = %s", (email,))
+                cursor.execute("SELECT user_id FROM users WHERE email = %s", (payload["email"],))
                 user_id_result = cursor.fetchone()
                 if user_id_result:
                     user_id = user_id_result[0]
@@ -524,9 +531,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         data = json.loads(data_rec.decode())
         record_text = data.get('record_text', '')
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 user_id = user[1] 
@@ -553,8 +560,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         reminder_text = data.get('reminder_text', '')
         reminder_date = data.get('reminder_date', '')
         
-        if reminder_text and reminder_date:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if reminder_text and reminder_date and payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
@@ -579,10 +587,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         can_view = data.get('can_view', '')
         can_edit = data.get('can_edit', '')
         
-        email = self.verify_user()
-        if email:
+        payload = self.verify_user()
+        if payload:
             if can_add and can_view and can_edit:
-                cursor.execute("SELECT type_id FROM users WHERE email = %s", (email,))
+                cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
                 user = cursor.fetchone()
                 type_id_u = user[0]
                 cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 6", (type_id_u))
@@ -604,9 +612,9 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def delete_health_record(self, record_id):
         
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchall()
             cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 2", (user['type_id'],))
             if cursor.fetchall():
@@ -624,9 +632,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def delete_reminder(self, reminder_id):
             
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
@@ -645,9 +653,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     def delete_user(self, user_id):
             
-        email = self.verify_user()
-        if email:
-            cursor.execute("SELECT type_id FROM users WHERE email = %s", (email,))
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
             user_type = cursor.fetchone()
             if user_type:
                 type_id = user_type[0]
