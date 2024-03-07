@@ -69,7 +69,6 @@ class RequestHandler(BaseHTTPRequestHandler):
     '''
         # HTTP REQUEST METHODS
         
-        GET     /register               creates a new user
         GET     /login                  authenticates a user
         GET     /profile                returns your profile info
         GET     /healthcare             returns all healthcare providers
@@ -83,6 +82,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         GET     /reminders/due          returns all due reminders
         GET     /reminders/:id          returns a specific reminder
         
+        POST     /register               creates a new user
         POST    /health_records         creates a new health rec
         POST    /reminders              creates a new reminder
         POST    /healthcare             creates a new healthcare provider
@@ -103,9 +103,7 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         paths = self.path.split('/')
         
-        if paths[1] == 'register':
-            self.create_new_user()
-        elif paths[1] == 'login':
+        if paths[1] == 'login':
             self.authenticate_user()
         elif paths[1] == 'profile':
             self.get_profile_info()
@@ -134,7 +132,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         paths = self.path.split('/')
         
-        if paths[1] == 'health_records':
+        if paths[1] == 'register':
+            self.create_new_user()
+        elif paths[1] == 'health_records':
             self.create_new_health_record()
         elif paths[1] == 'reminders':
             self.create_new_reminder()
