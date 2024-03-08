@@ -65,6 +65,17 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.set_Response(401, {'message': 'unauthorized, no authorization header provided'})
             return False
     
+    def check_permission(self, type_id, resource_id, action):
+        column_name = 'can_' + action
+        sql_query = "SELECT {} FROM permissions WHERE type_id = %s AND resource_id = %s".format(column_name)
+        cursor.execute(sql_query, (type_id, resource_id))
+        result = cursor.fetchone()
+        if result and int(result[0]):
+            return True
+        else:
+            self.set_Response(403, {'message': 'no {} permission'.format(action)})
+            return False
+    
     '''
         # HTTP REQUEST METHODS
         
@@ -223,7 +234,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 else:
                     self.set_Response(401, {'message': 'incorrect password'})
             else:
-                self.set_Response(404, {'message': 'user not found'})
+                self.set_Response(404, {'message': 'user not found!'})
         else:
             self.set_Response(400, {'message': 'bad request'})
 
@@ -242,7 +253,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 }
                 self.set_Response(200, profile)
             else:
-                self.set_Response(404, {'message': 'user not found'})
+                self.set_Response(404, {'message': 'user not found!'})
 
     
     def get_all_healthcare_providers(self):
@@ -253,9 +264,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             result = cursor.fetchone()
             if result:
                 type_id = result[0]
-                cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 3", (type_id,))
-                can_view = cursor.fetchone()
-                if can_view and can_view[0]:
+                if self.check_permission(type_id, 3, 'view'):
                     cursor.execute("SELECT provider_id, provider_name, provider_address, provider_contact FROM healthcare_providers")
                     healthcare_providers = cursor.fetchall()
                     providers_list = [
@@ -263,10 +272,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                         for provider in healthcare_providers
                     ]
                     self.set_Response(200, providers_list)
-                else:
-                    self.set_Response(403, {'message': 'no view permission'})
             else:
-                self.set_Response(403, {'message': 'user not found or no type_id associated'})
+                self.set_Response(403, {'message': 'user not found!'})
 
     
     def get_user_healthcare_provider(self):
@@ -274,23 +281,23 @@ class RequestHandler(BaseHTTPRequestHandler):
         payload = self.verify_user()
         if payload:
             cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
-            user = cursor.fetchall()
-            type_id, user_id = user
-            cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 4", (type_id,))
-            if cursor.fetchone():
-                cursor.execute("SELECT provider_id FROM user_provider WHERE user_id = %s", (user_id,))
-                provider_id = cursor.fetchone()
-                if provider_id:
-                    cursor.execute("SELECT * FROM healthcare_providers WHERE provider_id = %s", (provider_id[0],))
-                    healthcare_provider = cursor.fetchall()
-                    if healthcare_provider:
-                        self.set_Response(200, healthcare_provider)
+            user = cursor.fetchall()[0]
+            if user:
+                type_id, user_id = user
+                if self.check_permission(type_id, 3, 'view'):
+                    cursor.execute("SELECT provider_id FROM user_provider WHERE user_id = %s", (user_id,))
+                    provider_id = cursor.fetchone()
+                    if provider_id:
+                        cursor.execute("SELECT * FROM healthcare_providers WHERE provider_id = %s", (provider_id[0],))
+                        healthcare_provider = cursor.fetchall()
+                        if healthcare_provider:
+                            self.set_Response(200, healthcare_provider)
+                        else:
+                            self.set_Response(404, {'message': 'no healthcare provider found, pls contact with customer service'})
                     else:
                         self.set_Response(404, {'message': 'no healthcare provider found, pls contact with customer service'})
-                else:
-                    self.set_Response(404, {'message': 'no healthcare provider found, pls contact with customer service'})
             else:
-                self.set_Response(403, {'message': 'no view permission'})
+                self.set_Response(404, {'message': 'user not found'})
 
     
     def get_all_health_records(self):
@@ -301,9 +308,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
-                cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 2", (type_id,))
-                can_view = cursor.fetchone()
-                if can_view and can_view[0]:
+                if self.check_permission(type_id, 2, 'view'):
                     cursor.execute("SELECT * FROM health_records WHERE user_id = %s", (user_id,))
                     health_records = cursor.fetchall()
                     records_list = [
@@ -316,10 +321,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                         for record in health_records
                     ]
                     self.set_Response(200, records_list)
-                else:
-                    self.set_Response(403, {'message': 'no view permission'})
             else:
-                self.set_Response(404, {'message': 'user not found'})
+                self.set_Response(404, {'message': 'user not found!'})
 
     
     def get_specific_health_record(self, record_id):
@@ -330,9 +333,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
-                cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 2", (type_id,))
-                can_view = cursor.fetchone()
-                if can_view and can_view[0]:
+                if self.check_permission(type_id, 2, 'view'):
                     cursor.execute("SELECT * FROM health_records WHERE user_id = %s AND record_id = %s", (user_id, record_id))
                     record = cursor.fetchone()
                     if record:
@@ -345,10 +346,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                         self.set_Response(200, health_record)
                     else:
                         self.set_Response(404, {'message': 'health record not found'})
-                else:
-                    self.set_Response(403, {'message': 'no view permission'})
             else:
-                self.set_Response(404, {'message': 'user not found'})
+                self.set_Response(404, {'message': 'user not found!'})
 
     
     def get_all_permissions(self):
@@ -359,15 +358,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             result = cursor.fetchone()
             if result:
                 type_id = result[0]
-                cursor.execute("SELECT * FROM permissions WHERE type_id = %s", (type_id,))
-                permissions = cursor.fetchall()
-                if permissions:
+                if self.check_permission(type_id, 6, 'view'):
+                    cursor.execute("SELECT * FROM permissions")
+                    permissions = cursor.fetchall()
                     formatted_permissions = [{'resource_id': perm[0], 'type_id': perm[1], 'can_add': perm[2], 'can_view': perm[3], 'can_edit': perm[4]} for perm in permissions]
                     self.set_Response(200, formatted_permissions)
                 else:
                     self.set_Response(404, {'message': 'no permissions found'})
-            else:
-                self.set_Response(403, {'message': 'no view permission'})
 
     
     def get_all_users(self):
@@ -378,53 +375,51 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id = user[0]
-                cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 1", (type_id,))
-                can_view = cursor.fetchone()
-                if can_view and can_view[0]:
+                if self.check_permission(type_id, 1, 'view'):
                     cursor.execute("SELECT user_id, type_id, fullname, contact, email FROM users")
                     users = cursor.fetchall()
                     formatted_users = [{'user_id': user[0], 'type_id': user[1], 'fullname': user[2], 'contact': user[3], 'email': user[4]} for user in users]
                     self.set_Response(200, formatted_users)
-                else:
-                    self.set_Response(403, {'message': 'no view permission'})
             else:
-                self.set_Response(403, {'message': 'user not found or no type_id associated'})
+                self.set_Response(403, {'message': 'user not found!'})
     
     def get_all_reminders(self):
         
         payload = self.verify_user()
         if payload:
-            cursor.execute("SELECT user_id FROM users WHERE email = %s", (payload["email"],))
-            result = cursor.fetchone()
-            if result:
-                user_id = result[0]
-                cursor.execute("SELECT * FROM reminders WHERE user_id = %s", (user_id,))
-                reminders = cursor.fetchall()
-                if reminders:
-                    formatted_reminders = [{'reminder_id': rem[0], 'user_id': rem[1], 'reminder_text': rem[2], 'reminder_date': rem[3].isoformat()} for rem in reminders]
-                    self.set_Response(200, formatted_reminders)
-                else:
-                    self.set_Response(404, {'message': 'no reminders found'})
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
+            user = cursor.fetchone()
+            type_id, user_id = user
+            if user:
+                if self.check_permission(type_id, 5, 'view'):
+                    cursor.execute("SELECT * FROM reminders WHERE user_id = %s", (user_id,))
+                    reminders = cursor.fetchall()
+                    if reminders:
+                        formatted_reminders = [{'reminder_id': rem[0], 'user_id': rem[1], 'reminder_text': rem[2], 'reminder_date': rem[3].isoformat()} for rem in reminders]
+                        self.set_Response(200, formatted_reminders)
+                    else:
+                        self.set_Response(404, {'message': 'no reminders found'})
             else:
-                self.set_Response(403, {'message': 'user not found or no user_id associated'})
+                self.set_Response(403, {'message': 'user not found!'})
 
     def get_due_reminders(self):
         
         payload = self.verify_user()
         if payload:
-            cursor.execute("SELECT user_id FROM users WHERE email = %s", (payload["email"],))
-            result = cursor.fetchone()
-            if result:
-                user_id = result[0]
-                cursor.execute("SELECT * FROM reminders WHERE user_id = %s AND reminder_date BETWEEN CURDATE() AND CURDATE() + INTERVAL 1 DAY", (user_id,))
-                reminders = cursor.fetchall()
-                if reminders:
-                    formatted_due_reminders = [{'reminder_id': rem[0], 'user_id': rem[1], 'reminder_text': rem[2], 'reminder_date': rem[3]} for rem in reminders]
-                    self.set_Response(200, formatted_due_reminders)
-                else:
-                    self.set_Response(200, {'message': 'no due reminders'})
+            cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
+            user = cursor.fetchone()
+            type_id, user_id = user
+            if user:
+                if self.check_permission(type_id, 5, 'view'):
+                    cursor.execute("SELECT * FROM reminders WHERE user_id = %s AND reminder_date BETWEEN CURDATE() AND CURDATE() + INTERVAL 1 DAY", (user_id,))
+                    reminders = cursor.fetchall()
+                    if reminders:
+                        formatted_due_reminders = [{'reminder_id': rem[0], 'user_id': rem[1], 'reminder_text': rem[2], 'reminder_date': rem[3]} for rem in reminders]
+                        self.set_Response(200, formatted_due_reminders)
+                    else:
+                        self.set_Response(200, {'message': 'no due reminders'})
             else:
-                self.set_Response(403, {'message': 'user not found or no user_id associated'})
+                self.set_Response(403, {'message': 'user not found!'})
 
 
     def get_specific_reminder(self, reminder_id):
@@ -435,9 +430,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
-                cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 5", (type_id,))
-                can_view = cursor.fetchone()
-                if can_view and can_view[0]:
+                if self.check_permission(type_id, 5, 'view'):
                     cursor.execute("SELECT * FROM reminders WHERE user_id = %s AND reminder_id = %s", (user_id, reminder_id))
                     reminder = cursor.fetchone()
                     if reminder:
@@ -450,8 +443,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                         self.set_Response(200, reminder_dict)
                     else:
                         self.set_Response(404, {'message': 'reminder not found'})
-                else:
-                    self.set_Response(403, {'message': 'no view permission'})
+
 
     def create_new_health_record(self):
         
@@ -466,14 +458,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
-                cursor.execute("SELECT can_add FROM permissions WHERE type_id = %s AND resource_id = 2", (type_id,))
-                can_add = cursor.fetchone()
-                if can_add and can_add[0]:
+                if self.check_permission(type_id, 2, 'add'):
                     cursor.execute("INSERT INTO health_records (user_id, record_text) VALUES (%s, %s)", (user_id, record_text))
                     db_connection.commit()
                     self.set_Response(200, {'message': 'health record created successfully'})
-                else:
-                    self.set_Response(403, {'message': 'no add permission'})
+            else:
+                self.set_Response(404, {'message': 'user not found'})
         else:
             self.set_Response(400, {'message': 'bad request'})
             
@@ -493,14 +483,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
-                cursor.execute("SELECT can_add FROM permissions WHERE type_id = %s AND resource_id = 5", (type_id,))
-                can_add = cursor.fetchone()
-                if can_add and can_add[0]:
+                if self.check_permission(type_id, 5, 'add'):
                     cursor.execute("INSERT INTO reminders (user_id, reminder_text, reminder_date) VALUES (%s, %s, %s)", (user_id, reminder_text, reminder_date))
                     db_connection.commit()
                     self.set_Response(200, {'message': 'reminder created successfully'})
-                else:
-                    self.set_Response(403, {'message': 'no add permission'})
+            else:
+                self.set_Response(404, {'message': 'user not found!'})
         else:
             self.set_Response(400, {'message': 'bad request'})
 
@@ -519,13 +507,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             if provider_name and provider_address and provider_contact:
                 cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
                 type_id = cursor.fetchone()[0]
-                cursor.execute("SELECT can_add FROM permissions WHERE type_id = %s AND resource_id = 3", (type_id,))
-                if cursor.fetchone():
+                if self.check_permission(type_id, 3, 'add'):
                     cursor.execute("INSERT INTO healthcare_providers (provider_name, provider_address, provider_contact) VALUES (%s, %s, %s)", (provider_name, provider_address, provider_contact))
                     db_connection.commit()
                     self.set_Response(200, {'message': 'healthcare provider created successfully'})
-                else:
-                    self.set_Response(403, {'message': 'no add permission'})
             else:
                 self.set_Response(400, {'message': 'bad request'})
     
@@ -542,12 +527,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         if payload:
             if fullname and contact:
                 cursor.execute("SELECT user_id FROM users WHERE email = %s", (payload["email"],))
-                user_id_result = cursor.fetchone()
-                if user_id_result:
-                    user_id = user_id_result[0]
+                user_id = cursor.fetchone()[0]
+                if user_id:
                     cursor.execute("UPDATE users SET fullname = %s, contact = %s WHERE user_id = %s", (fullname, contact, user_id))
                     db_connection.commit()
                     self.set_Response(200, {'message': 'profile updated successfully'})
+                else:
+                    self.set_Response(404, {'message': 'user not found!'})
             else:
                 self.set_Response(400, {'message': 'user not found'})
 
@@ -564,18 +550,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchone()
             if user:
-                user_id = user[1] 
-                type_id = user[0]
-                cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 2", (type_id,))
-                can_edit = cursor.fetchone()
-                if can_edit and can_edit[0]:
+                type_id, user_id = user
+                if self.check_permission(type_id, 2, 'edit'):
                     cursor.execute("UPDATE health_records SET record_text = %s WHERE user_id = %s AND record_id = %s", (record_text, user_id, record_id))
                     db_connection.commit()
                     self.set_Response(200, {'message': 'health record updated successfully'})
-                else:
-                    self.set_Response(403, {'message': 'no edit permission'})
             else:
-                self.set_Response(404, {'message': 'user not found'})
+                self.set_Response(404, {'message': 'user not found!'})
         else:
             self.set_Response(400, {'message': 'bad request'})
 
@@ -594,48 +575,46 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
-                cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 5", (type_id,))
-                can_edit = cursor.fetchone()
-                if can_edit and can_edit[0]:
+                if self.check_permission(type_id, 5, 'edit'):
                     cursor.execute("UPDATE reminders SET reminder_text = %s, reminder_date = %s WHERE user_id = %s AND reminder_id = %s", 
-                                   (reminder_text, reminder_date, user_id, reminder_id))
-                    db_connection.commit()
-                    self.set_Response(200, {'message': 'reminder updated successfully'})
-                else:
-                    self.set_Response(403, {'message': 'no edit permission'})
+                                (reminder_text, reminder_date, user_id, reminder_id))
+                    if cursor.rowcount > 0:
+                        db_connection.commit()
+                        self.set_Response(200, {'message': 'reminder updated successfully'})
+                    else:
+                        self.set_Response(404, {'message': 'reminder not found'})
             else:
-                self.set_Response(404, {'message': 'reminder not found'})
+                self.set_Response(404, {'message': 'user not found'})
+                
 
     
     def update_permission(self, res_id, type_id):
         content_len = int(self.headers['Content-Length'])
         data_rec = self.rfile.read(content_len)
         data = json.loads(data_rec.decode())
-        can_add = int(data.get('can_add', 0))
-        can_view = int(data.get('can_view', 0))
-        can_edit = int(data.get('can_edit', 0))
+        can_add = data.get('can_add', False)
+        can_view = data.get('can_view', False)
+        can_edit = data.get('can_edit', False)
+        print("res_id and type_id: ", res_id, type_id)
         
         payload = self.verify_user()
         if payload:
-            if can_add and can_view and can_edit:
-                cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
-                user = cursor.fetchone()
+            cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
+            user = cursor.fetchone()
+            if user:
                 type_id_u = user[0]
-                cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 6", (type_id_u))
-                if cursor.fetchone():
-                    cursor.execute("SELECT * FROM permissions WHERE resource_id = %s AND type_id = %s", (res_id, type_id))
-                    permission = cursor.fetchall()
-                    if permission:
-                        cursor.execute("UPDATE permissions SET can_add = %s, can_view = %s, can_edit = %s WHERE resource_id = %s AND type_id = %s", 
-                           (can_add, can_view, can_edit, res_id, type_id))
+                cursor.execute("SELECT * FROM permissions WHERE resource_id = %s AND type_id = %s", (res_id, type_id))
+                permission_exists = cursor.fetchone()
+                if permission_exists:
+                    if self.check_permission(type_id_u, 6, 'edit'): 
+                        cursor.execute("UPDATE permissions SET can_add = %s, can_view = %s, can_edit = %s WHERE resource_id = %s AND type_id = %s",
+                                    (can_add, can_view, can_edit, res_id, type_id))
                         db_connection.commit()
                         self.set_Response(200, {'message': 'permission updated successfully'})
-                    else:
-                        self.set_Response(404, {'message': 'permission not found'})
                 else:
-                    self.set_Response(403, {'message': 'no edit permission'})
+                    self.set_Response(404, {'message': 'permission not found'})
             else:
-                self.set_Response(400, {'message': 'bad request'})
+                self.set_Response(404, {'message': 'user not found!'})
         
 
     def delete_health_record(self, record_id):
@@ -643,19 +622,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         payload = self.verify_user()
         if payload:
             cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
-            result = cursor.fetchone()
-            if result:
-                type_id, user_id = result
-                cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 2", (type_id,))
-                if cursor.fetchone():
+            user = cursor.fetchone()
+            if user:
+                type_id, user_id = user
+                if self.check_permission(type_id, 2, 'edit'):
                     cursor.execute("DELETE FROM health_records WHERE user_id = %s AND record_id = %s", (user_id, record_id))
                     if cursor.rowcount > 0:
                         db_connection.commit()
                         self.set_Response(200, {'message': 'health record deleted successfully'})
                     else:
                         self.set_Response(404, {'message': 'health record not found'})
-                else:
-                    self.set_Response(403, {'message': 'no edit permission'})
             else:
                 self.set_Response(404, {'message': 'user not found'})
 
@@ -668,17 +644,15 @@ class RequestHandler(BaseHTTPRequestHandler):
             user = cursor.fetchone()
             if user:
                 type_id, user_id = user
-                cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 5", (type_id,))
-                can_edit = cursor.fetchone()
-                if can_edit and can_edit[0]:
+                if self.check_permission(type_id, 5, 'edit'):
                     cursor.execute("DELETE FROM reminders WHERE user_id = %s AND reminder_id = %s", (user_id, reminder_id))
-                    db_connection.commit()
                     if cursor.rowcount > 0:
+                        db_connection.commit()
                         self.set_Response(200, {'message': 'reminder deleted successfully'})
                     else:
                         self.set_Response(404, {'message': 'reminder not found'})
-                else:
-                    self.set_Response(403, {'message': 'no edit permission'})
+            else:
+                self.set_Response(404, {'message': 'user not found!'})
     
     
     def delete_user(self, user_id):
@@ -689,20 +663,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             user_type = cursor.fetchone()
             if user_type:
                 type_id = user_type[0]
-                cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 1", (type_id,))
-                can_edit = cursor.fetchone()
-                if can_edit and can_edit[0]:
+                if self.check_permission(type_id, 1, 'edit'):
                     cursor.execute("DELETE FROM user_provider WHERE user_id = %s", (user_id,))
                     cursor.execute("DELETE FROM health_records WHERE user_id = %s", (user_id,))
                     cursor.execute("DELETE FROM reminders WHERE user_id = %s", (user_id,))
                     cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-                    db_connection.commit()
                     if cursor.rowcount > 0:
+                        db_connection.commit()
                         self.set_Response(200, {'message': 'user deleted successfully'})
                     else:
-                        self.set_Response(404, {'message': 'user not found'})
-                else:
-                    self.set_Response(403, {'message': 'no edit permission'})
+                        self.set_Response(404, {'message': 'selected user not found'})
     
 
 def run(serverClass=HTTPServer, handlerClass=RequestHandler, port=8080):

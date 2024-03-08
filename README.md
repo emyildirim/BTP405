@@ -75,17 +75,17 @@ docker-compose up
 | Method | Endpoint | Description | Request Body (JSON) | Ex. Response |
 |--------|----------|-------------|---------------------|--------------|
 | GET | /login | Authenticates a user | {"email": "name@gmail.com", "password": "pass"} | {"message": "login successful", "token": "<token>"} |
-| GET | /profile | Returns your profile info | N/A | {"fullname": "John Doe", "contact": "123-456-7890", "email": "name@gmail.com"} |
-| GET | /users | Returns all the users | N/A | {"fullname": "John Doe", "contact": "123-456-7890", "email": "name@gmail.com"} |
-| GET | /healthcare | Returns all healthcare providers | N/A | [{"provider_id": 1, "provider_name": "Provider A", "provider_address": "Address A", "provider_contact": "Contact A"}] |
-| GET | /healthcare/me | Returns the user's healthcare provider | N/A | {"provider_id": 1, "provider_name": "Provider A", "provider_address": "Address A", "provider_contact": "Contact A"} |
-| GET | /health_records | Returns all health records | N/A | [{"record_id": 1, "user_id": 1, "record_date": "2023-01-01", "record_text": "Sample record"}] |
-| GET | /health_records/:id | Returns a specific health record | N/A | {"record_id": 1, "user_id": 1, "record_date": "2023-01-01", "record_text": "Sample record"} |
-| GET | /permissions | Returns all the permissions | N/A | [{"resource_id": 1, "type_id": 1, "can_add": true, "can_view": true, "can_edit": true}] |
-| GET | /reminders | Returns all reminders | N/A | [{"reminder_id": 1, "user_id": 1, "reminder_text": "Appointment", "reminder_date": "2023-01-10"}] |
-| GET | /reminders/due | Returns all due reminders | N/A | [{"reminder_id": 1, "user_id": 1, "reminder_text": "Appointment", "reminder_date": "2023-01-10"}] |
-| GET | /reminders/:id | Returns a specific reminder | N/A | {"reminder_id": 1, "user_id": 1, "reminder_text": "Appointment", "reminder_date": "2023-01-10"} |
-| POST | /register | Creates a new user | {"email": "newuser@example.com", "password": "newpass"} | {"message": "user created successfully", "token": "<token>"} |
+| GET | /profile | Returns your profile info | N/A | {fullname, contact, email} |
+| GET | /users | Returns all the users | N/A | [{user_id, type_id, fullname, contact, email}] |
+| GET | /healthcare | Returns all healthcare providers | N/A | [{provider_id, provider_name, provider_address, provider_contact}] |
+| GET | /healthcare/me | Returns the user's healthcare provider | N/A | {provider_id, provider_name, provider_address, provider_contact} |
+| GET | /health_records | Returns all health records | N/A | [{record_id, user_id, record_date, record_text}] |
+| GET | /health_records/:id | Returns a specific health record | N/A | {record_id, user_id, record_date, record_text} |
+| GET | /permissions | Returns all the permissions | N/A | [{resource_id, type_id, can_add, can_view, can_edit}] |
+| GET | /reminders | Returns all reminders | N/A | [{reminder_id, user_id, reminder_text, reminder_date}] |
+| GET | /reminders/due | Returns all due reminders | N/A | [{reminder_id, user_id, reminder_text, reminder_date}] |
+| GET | /reminders/:id | Returns a specific reminder | N/A | {reminder_id, user_id, reminder_text, reminder_date} |
+| POST | /register | Creates a new user | {"type_id": 3, "fullname": "Name Surname", "contact": "1234567890","email": "newuser@example.com", "password": "newpass"} | {"message": "user created successfully", "token": "<token>"} |
 | POST | /health_records | Creates a new health record | {"record_text": "New record"} | {"message": "health record created successfully"} |
 | POST | /reminders | Creates a new reminder | {"reminder_text": "New reminder", "reminder_date": "2023-02-10"} | {"message": "reminder created successfully"} |
 | POST | /healthcare | Creates a new healthcare provider | {"provider_name": "New Provider", "provider_address": "New Address", "provider_contact": "New Contact"} | {"message": "healthcare provider created successfully"} |
