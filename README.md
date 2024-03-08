@@ -72,4 +72,27 @@ docker-compose up
   
   
 ## Endpoints
-
+| Method | Endpoint | Description | Request Body (JSON) | Ex. Response |
+|--------|----------|-------------|---------------------|--------------|
+| GET | /login | Authenticates a user | {"email": "name@gmail.com", "password": "pass"} | {"message": "login successful", "token": "<token>"} |
+| GET | /profile | Returns your profile info | N/A | {"fullname": "John Doe", "contact": "123-456-7890", "email": "name@gmail.com"} |
+| GET | /users | Returns all the users | N/A | {"fullname": "John Doe", "contact": "123-456-7890", "email": "name@gmail.com"} |
+| GET | /healthcare | Returns all healthcare providers | N/A | [{"provider_id": 1, "provider_name": "Provider A", "provider_address": "Address A", "provider_contact": "Contact A"}] |
+| GET | /healthcare/me | Returns the user's healthcare provider | N/A | {"provider_id": 1, "provider_name": "Provider A", "provider_address": "Address A", "provider_contact": "Contact A"} |
+| GET | /health_records | Returns all health records | N/A | [{"record_id": 1, "user_id": 1, "record_date": "2023-01-01", "record_text": "Sample record"}] |
+| GET | /health_records/:id | Returns a specific health record | N/A | {"record_id": 1, "user_id": 1, "record_date": "2023-01-01", "record_text": "Sample record"} |
+| GET | /permissions | Returns all the permissions | N/A | [{"resource_id": 1, "type_id": 1, "can_add": true, "can_view": true, "can_edit": true}] |
+| GET | /reminders | Returns all reminders | N/A | [{"reminder_id": 1, "user_id": 1, "reminder_text": "Appointment", "reminder_date": "2023-01-10"}] |
+| GET | /reminders/due | Returns all due reminders | N/A | [{"reminder_id": 1, "user_id": 1, "reminder_text": "Appointment", "reminder_date": "2023-01-10"}] |
+| GET | /reminders/:id | Returns a specific reminder | N/A | {"reminder_id": 1, "user_id": 1, "reminder_text": "Appointment", "reminder_date": "2023-01-10"} |
+| POST | /register | Creates a new user | {"email": "newuser@example.com", "password": "newpass"} | {"message": "user created successfully", "token": "<token>"} |
+| POST | /health_records | Creates a new health record | {"record_text": "New record"} | {"message": "health record created successfully"} |
+| POST | /reminders | Creates a new reminder | {"reminder_text": "New reminder", "reminder_date": "2023-02-10"} | {"message": "reminder created successfully"} |
+| POST | /healthcare | Creates a new healthcare provider | {"provider_name": "New Provider", "provider_address": "New Address", "provider_contact": "New Contact"} | {"message": "healthcare provider created successfully"} |
+| PUT | /profile | Updates your profile | {"fullname": "John Doe Updated", "contact": "987-654-3210"} | {"message": "profile updated successfully"} |
+| PUT | /health_records/:id | Updates a specific health record | {"record_text": "Updated record"} | {"message": "health record updated successfully"} |
+| PUT | /reminders/:id | Updates a specific reminder | {"reminder_text": "Updated reminder", "reminder_date": "2023-03-10"} | {"message": "reminder updated successfully"} |
+| PUT | /permissions/:id1/:id2 | Updates a specific permission | {"can_add": true, "can_view": true, "can_edit": false} | {"message": "permission updated successfully"} |
+| DELETE | /health_records/:id | Deletes a specific health record | N/A | {"message": "health record deleted successfully"} |
+| DELETE | /reminders/:id | Deletes a specific reminder | N/A | {"message": "reminder deleted successfully"} |
+| DELETE | /users/:id | Deletes a specific user | N/A | {"message":"user deleted successfully"} |

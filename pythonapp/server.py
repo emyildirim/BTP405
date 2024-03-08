@@ -9,8 +9,7 @@ import jwt
 
 load_dotenv('./.env')
 
-
-#replace the secret key with yours
+#replace the secret key with yours in the .env
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # Establish connection to MySQL
@@ -63,7 +62,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             else:
                 return value
         else:
-            self.set_Response(401, {'message': 'unauthorized, no Authorization header provided'})
+            self.set_Response(401, {'message': 'unauthorized, no authorization header provided'})
             return False
     
     '''
@@ -77,6 +76,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         GET     /health_records         returns all health rec
         GET     /health_records/:id     returns a specific health rec
         GET     /permissions            returns all the permissions
+        GET     /users                  returns all users
         
         GET     /reminders              returns all reminders
         GET     /reminders/due          returns all due reminders
@@ -120,6 +120,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.get_specific_health_record(record_id)
         elif paths[1] == 'permissions':
             self.get_all_permissions()
+        elif paths[1] == 'users':
+            self.get_all_users()
         elif paths[1] == 'reminders':
             if len(paths) == 2:
                 self.get_all_reminders()
@@ -273,12 +275,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         if payload:
             cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
             user = cursor.fetchall()
-            cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 4", (user['type_id'],))
+            type_id, user_id = user
+            cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 4", (type_id,))
             if cursor.fetchone():
-                cursor.execute("SELECT * FROM users INNER JOIN user_provider ON users.user_id = user_provider.user_id INNER JOIN healthcare_providers ON user_provider.provider_id = healthcare_providers.provider_id WHERE user_id = %s", (user['user_id'],))
-                healthcare_provider = cursor.fetchone()
-                if healthcare_provider:
-                    self.set_Response(200, healthcare_provider)
+                cursor.execute("SELECT provider_id FROM user_provider WHERE user_id = %s", (user_id,))
+                provider_id = cursor.fetchone()
+                if provider_id:
+                    cursor.execute("SELECT * FROM healthcare_providers WHERE provider_id = %s", (provider_id[0],))
+                    healthcare_provider = cursor.fetchall()
+                    if healthcare_provider:
+                        self.set_Response(200, healthcare_provider)
+                    else:
+                        self.set_Response(404, {'message': 'no healthcare provider found, pls contact with customer service'})
                 else:
                     self.set_Response(404, {'message': 'no healthcare provider found, pls contact with customer service'})
             else:
@@ -302,7 +310,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                         {
                             'record_id': record[0],
                             'user_id': record[1],
-                            'record_date': record[2],
+                            'record_date': record[2].isoformat() if record[2] else None,
                             'record_text': record[3]
                         }
                         for record in health_records
@@ -326,15 +334,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                 can_view = cursor.fetchone()
                 if can_view and can_view[0]:
                     cursor.execute("SELECT * FROM health_records WHERE user_id = %s AND record_id = %s", (user_id, record_id))
-                    health_record = cursor.fetchone()
-                    if health_record:
-                        record = {
-                            'record_id': health_record[0],
-                            'user_id': health_record[1],
-                            'record_date': health_record[2],
-                            'record_text': health_record[3]
+                    record = cursor.fetchone()
+                    if record:
+                        health_record = {
+                            'record_id': record[0],
+                            'user_id': record[1],
+                            'record_date': record[2].isoformat() if record[2] else None,
+                            'record_text': record[3]
                         }
-                        self.set_Response(200, record)
+                        self.set_Response(200, health_record)
                     else:
                         self.set_Response(404, {'message': 'health record not found'})
                 else:
@@ -361,6 +369,26 @@ class RequestHandler(BaseHTTPRequestHandler):
             else:
                 self.set_Response(403, {'message': 'no view permission'})
 
+    
+    def get_all_users(self):
+            
+        payload = self.verify_user()
+        if payload:
+            cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
+            user = cursor.fetchone()
+            if user:
+                type_id = user[0]
+                cursor.execute("SELECT can_view FROM permissions WHERE type_id = %s AND resource_id = 1", (type_id,))
+                can_view = cursor.fetchone()
+                if can_view and can_view[0]:
+                    cursor.execute("SELECT user_id, type_id, fullname, contact, email FROM users")
+                    users = cursor.fetchall()
+                    formatted_users = [{'user_id': user[0], 'type_id': user[1], 'fullname': user[2], 'contact': user[3], 'email': user[4]} for user in users]
+                    self.set_Response(200, formatted_users)
+                else:
+                    self.set_Response(403, {'message': 'no view permission'})
+            else:
+                self.set_Response(403, {'message': 'user not found or no type_id associated'})
     
     def get_all_reminders(self):
         
@@ -394,7 +422,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     formatted_due_reminders = [{'reminder_id': rem[0], 'user_id': rem[1], 'reminder_text': rem[2], 'reminder_date': rem[3]} for rem in reminders]
                     self.set_Response(200, formatted_due_reminders)
                 else:
-                    self.set_Response(404, {'message': 'no due reminders'})
+                    self.set_Response(200, {'message': 'no due reminders'})
             else:
                 self.set_Response(403, {'message': 'user not found or no user_id associated'})
 
@@ -417,7 +445,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                             'reminder_id': reminder[0],
                             'user_id': reminder[1],
                             'reminder_text': reminder[2],
-                            'reminder_date': reminder[3]
+                            'reminder_date': reminder[3].isoformat() if reminder[2] else None
                         }
                         self.set_Response(200, reminder_dict)
                     else:
@@ -489,9 +517,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         payload = self.verify_user()
         if payload:
             if provider_name and provider_address and provider_contact:
-                cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
-                user = cursor.fetchall()
-                cursor.execute("SELECT can_add FROM permissions WHERE type_id = %s AND resource_id = 3", (user['type_id'],))
+                cursor.execute("SELECT type_id FROM users WHERE email = %s", (payload["email"],))
+                type_id = cursor.fetchone()[0]
+                cursor.execute("SELECT can_add FROM permissions WHERE type_id = %s AND resource_id = 3", (type_id,))
                 if cursor.fetchone():
                     cursor.execute("INSERT INTO healthcare_providers (provider_name, provider_address, provider_contact) VALUES (%s, %s, %s)", (provider_name, provider_address, provider_contact))
                     db_connection.commit()
@@ -583,9 +611,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         content_len = int(self.headers['Content-Length'])
         data_rec = self.rfile.read(content_len)
         data = json.loads(data_rec.decode())
-        can_add = data.get('can_add', '')
-        can_view = data.get('can_view', '')
-        can_edit = data.get('can_edit', '')
+        can_add = int(data.get('can_add', 0))
+        can_view = int(data.get('can_view', 0))
+        can_edit = int(data.get('can_edit', 0))
         
         payload = self.verify_user()
         if payload:
@@ -615,19 +643,21 @@ class RequestHandler(BaseHTTPRequestHandler):
         payload = self.verify_user()
         if payload:
             cursor.execute("SELECT type_id, user_id FROM users WHERE email = %s", (payload["email"],))
-            user = cursor.fetchall()
-            cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 2", (user['type_id'],))
-            if cursor.fetchall():
-                cursor.execute("SELECT * FROM health_records WHERE user_id = %s AND record_id = %s", (user['user_id'], record_id))
-                health_rec = cursor.fetchall()
-                if health_rec:
-                    cursor.execute("DELETE FROM health_records WHERE user_id = %s AND record_id = %s", (user['user_id'], record_id))
-                    db_connection.commit()
-                    self.set_Response(200, {'message': 'health record deleted successfully'})
+            result = cursor.fetchone()
+            if result:
+                type_id, user_id = result
+                cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 2", (type_id,))
+                if cursor.fetchone():
+                    cursor.execute("DELETE FROM health_records WHERE user_id = %s AND record_id = %s", (user_id, record_id))
+                    if cursor.rowcount > 0:
+                        db_connection.commit()
+                        self.set_Response(200, {'message': 'health record deleted successfully'})
+                    else:
+                        self.set_Response(404, {'message': 'health record not found'})
                 else:
-                    self.set_Response(404, {'message': 'health record not found'})
+                    self.set_Response(403, {'message': 'no edit permission'})
             else:
-                self.set_Response(403, {'message': 'no edit permission'})
+                self.set_Response(404, {'message': 'user not found'})
 
     
     def delete_reminder(self, reminder_id):
@@ -662,6 +692,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 cursor.execute("SELECT can_edit FROM permissions WHERE type_id = %s AND resource_id = 1", (type_id,))
                 can_edit = cursor.fetchone()
                 if can_edit and can_edit[0]:
+                    cursor.execute("DELETE FROM user_provider WHERE user_id = %s", (user_id,))
+                    cursor.execute("DELETE FROM health_records WHERE user_id = %s", (user_id,))
+                    cursor.execute("DELETE FROM reminders WHERE user_id = %s", (user_id,))
                     cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
                     db_connection.commit()
                     if cursor.rowcount > 0:
