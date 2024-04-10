@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mysql:
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      MYSQL_DATABASE: db
+      MYSQL_ROOT_PASSWORD: password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  pythonapp:
+    build:
+      context: ./pythonapp
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - '8080:8080'
+
+  nextjsapp:
+    build:
+      context: ./my-app
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      pythonapp:
+        condition: service_started
+    ports:
+      - '3000:3000'

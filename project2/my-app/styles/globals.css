@@ -1,0 +1,18 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+#root,
+#__next {
+  /* use #root for CRA or #__next for Next.js */
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.content {
+  /* class for the main content wrapper */
+  flex: 1;
+}
