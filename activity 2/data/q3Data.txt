@@ -1,0 +1,4 @@
+Write a Python function wordCount(t) which retrives data 
+in a text file t and returns a dictionary where the keys 
+are unique words in the files and the corresponding values 
+are lists of line numbers where the words are found in the text.
