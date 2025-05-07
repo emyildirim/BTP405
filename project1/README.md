@@ -2,6 +2,7 @@
 
 ## Description:
 The design is built using microservice architecture to maximize scalability and create a maintainable system environment. Each microservice can handle a specific feature and role such as data storage, data sharing, authentication. The architecture also allows faster development cycle while using agile methodologies.
+<img width="1277" alt="image" src="https://github.com/user-attachments/assets/f268bbec-9155-43d5-8b2b-e1622760cb52" />
 
 Python RESTful API handles all the HTTP requests and connects the front-end and the database. The key features of the cloud based PHR system follows:
  
