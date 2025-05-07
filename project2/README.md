@@ -10,6 +10,7 @@
   
 
 The Cloud-based Restaurant Reservation system is designed to enable users and restaurant staff to manage reservations efficiently, all in one place. This full-stack application is hosted on the AWS cloud service through a virtual machine, leveraging a microservices architecture for enhanced scalability and maintenance. It features a RESTful API written in Python, with MySQL for database management, and utilizes Next.js and React for the user interface. Security and privacy are paramount, with JWT (JSON Web Token) ensuring encrypted communication between the client and the server.
+<img width="1458" alt="image" src="https://github.com/user-attachments/assets/d4d6c787-70ac-4fb8-b844-3d44cd2c8da4" />
 
   
 
